@@ -1,0 +1,9 @@
+I don't have specific threads saved, mostly saw it on my feed from RL/agent accounts on X and a few Rednote posts comparing it to Voyager and ADAS. The main discussion point was whether the skill library or the RL is doing the heavy lifting — their ablation shows removing skills drops 25% but removing RL also drops 20%, so neither works alone.
+
+Agreed on the hierarchical overclaim. I checked their repo — it's literally just a "general" tag vs "task-specific" tag on flat skill entries. No composition, no tree structure.
+
+On failure-based extraction: yes, good timing — we just found and fixed a ground-truth leakage bug in the math and LCB feedback engines (math was telling the model the expected answer on retry, LCB was leaking private test results). Now that feedback is clean, we have proper failure trajectories to learn from. Their format for failure lessons is (description, why_it_happens, how_to_avoid) which maps to a new concept kind in our repo. I agree this makes more sense for math/code than ARC — "don't try brute force on problems with large input space" is more useful than "don't use the wrong grid transformation."
+
+On recursive vs cold-start: right, our dynamic memory setting already supports this loop (run → update memory → re-run). The gap is we haven't tested it with failure-driven updates, only with success-driven concept accumulation. Adding failure extraction to the update step and running a few iterations would test the recursive idea without RL overhead. Cost-wise it's just N extra inference runs + teacher calls for failure analysis between runs, so much cheaper than their 8xH100 RL setup.
+
+Current priority is getting clean baseline numbers with the fixed feedback (runs in progress now), then we can test whether failure-driven skill extraction helps on the problems where concepts currently hurt.
