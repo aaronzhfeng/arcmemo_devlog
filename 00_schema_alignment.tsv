@@ -1,0 +1,78 @@
+# Schema & Pipeline Alignment: mem2 vs arcmemo
+# Check before any pipeline change. Last verified: 2026-02-28
+
+### CONCEPT SCHEMA (Concept dataclass)
+# arcmemo: arc_memo/concept_mem/memory/v4/concept.py
+# mem2:    src/mem2/concepts/data.py
+field	arcmemo	mem2	prompt_requests	status	notes
+name	str	str	yes	MATCHED
+kind	str	str	yes	MATCHED	arcmemo: routine/structure; math: theorem/technique/strategy/definition
+routine_subtype	str?	str?	no	MATCHED	ARC-only (grid manipulation, selection criteria, etc.)
+output_typing	str?	str?	no	MATCHED	ARC-only (bool, grid, list[grid], etc.)
+parameters	list[ParameterSpec]	list[ParameterSpec]	yes	MATCHED	{name, typing, description}
+description	str?	str?	yes	MATCHED
+cues	list[str]	list[str]	yes	MATCHED	2-4 per concept
+implementation	list[str]	list[str]	yes	MATCHED	1-2 per concept
+used_in	list[str]	list[str]	auto	MATCHED	problem UIDs, tracked by write_concept()
+merge_logic	dedup+merge	dedup+merge	-	MATCHED	Concept.update()
+rendering	to_string()	to_string()	-	MATCHED	skip_* flags, indentation, YAML-ish format
+
+### EXTRACTION PIPELINE
+step	arcmemo	mem2_current	mem2_planned	status	notes
+stage1_model	gpt-4.1	qwen-2.5-7b	gpt-4.1	PLANNED
+stage1_icl_examples	3-5 hand-annotated	1 math example	1 math example	PARTIAL	fewer ICL examples
+stage1_output	<pseudocode> + <summary>	same	same	MATCHED
+stage2_model	gpt-4.1	qwen-2.5-7b	gpt-4.1	PLANNED
+stage2_icl_examples	3-5 hand-annotated	1 math example	1 math example	PARTIAL	fewer ICL examples
+stage2_kind_system	fixed (routine/structure)	fixed (theorem/technique/strategy/definition)	same	MATCHED	domain-adapted
+stage2_concept_repo	full to_string()	name + desc + 3 cues	same	LIGHTER	intentional for token budget
+stage2_anti_bloat	implicit via ARC kinds	explicit naming rules + bad/good examples	same	mem2 STRONGER
+stage2_seed_concepts	prelim2.yaml (25+ concepts)	none	none	GAP	could help consistency
+stage2_schema_fields	all fields requested	all fields requested (v2)	same	MATCHED
+batching	batch_size=10, repo grows	same	same	MATCHED
+
+### SELECTION PIPELINE
+step	arcmemo	mem2	status	notes
+input_format	numbered lessons (situation/suggestion)	named concepts (cues/impl/params)	DIFFERENT	both functional
+problem_info	VLM description or metadata	raw problem_text (LaTeX)	mem2 MORE	full problem statement
+output_format	integer indices	concept name strings	mem2 BETTER	robust to reordering
+top_k	explicit in prompt	1-5 guidance	MATCHED
+reasoning_step	none	think step by step	mem2 STRONGER
+negative_guidance	none	don't force-fit	mem2 STRONGER
+scoring_mode	yes (0.0-1.0)	no	GAP	low priority
+reselection	RESELECT_PROMPT + prev attempt	include_reselected_lessons	MATCHED
+
+### HINT INJECTION
+step	arcmemo	mem2	status	notes
+position	between problem and instructions	same	MATCHED
+rendering	4-section (structures/types/grid-manip/other)	flat list by kind	DIFFERENT	domain-specific, both valid
+render_modes	full + skip variants	full / cues_only / name_only	MATCHED
+framing	long explanation + recommendations	short actionable framing	mem2 CLEANER
+
+### INFERENCE MODE
+mode	arcmemo	mem2_code	mem2_reason	status	notes
+output_format	Python code (transform)	Python code (solve())	math reasoning + \boxed{N}	NEW	math_reason engine added
+evaluator	exec transform()	exec solve()	parse \boxed{} from text	NEW	math_reason_eval added
+feedback	exec/mismatch errors	exec/parse errors	parse issue / incorrect	NEW	math_reason_gt added
+extraction_source	model code output	model code output	model reasoning output	NEW	--stage1-mode passthrough/reasoning
+
+### MODELS
+role	arcmemo	mem2_current	mem2_planned	status
+extraction	gpt-4.1-2025-04-14	qwen/qwen-2.5-7b-instruct	gpt-4.1-2025-04-14	PLANNED
+selection	gpt-4.1-2025-04-14	qwen/qwen3-coder-30b-a3b	gpt-4.1-2025-04-14	PLANNED
+inference	o4-mini-2025-04-16	qwen/qwen-2.5-7b-instruct	gpt-5-mini	PLANNED
+reselection	gpt-4.1-2025-04-14	same as selection	gpt-4.1-2025-04-14	PLANNED
+
+### KNOWN GAPS
+id	area	issue	impact	notes
+G1	extraction	ICL example count: arcmemo 3-5 (ARC), mem2 1 (math/code)	medium	per-benchmark issue: ARC extraction not in mem2; math/code need more examples
+G2	extraction	No seed/preliminary concepts	medium	arcmemo has prelim2.yaml with 25+ concepts
+G3	schema	No concept hierarchy (parents, associated_concepts)	CLOSED	verified: arcmemo defines but NEVER reads these at runtime (orphaned code)
+G4	selection	No scoring mode (0.0-1.0 per concept)	low
+G5	selection	Single selection template vs arcmemo 5+ variants	low
+
+### UPDATE LOG
+date	changes
+2026-02-28	Initial creation. Verified schema parity. Updated extraction/selection prompts to v2.
+2026-02-28	Closed G3: hierarchy fields are dead code in arcmemo (defined in unused hierarchical/ version, commented out in active v4). Updated G1: per-benchmark framing.
+2026-02-28	Added INFERENCE MODE section: math_reason engine (reasoning + \boxed{}), math_reason_eval (text parsing), math_reason_gt (no-leak feedback). Extraction supports --stage1-mode passthrough/reasoning.
