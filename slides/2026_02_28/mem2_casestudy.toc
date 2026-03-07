@@ -1,0 +1,6 @@
+\beamer@sectionintoc {1}{Setup}{2}{0}{1}
+\beamer@sectionintoc {2}{Extracted Concepts}{4}{0}{2}
+\beamer@sectionintoc {3}{Math Results}{11}{0}{3}
+\beamer@sectionintoc {4}{Code Results}{14}{0}{4}
+\beamer@sectionintoc {5}{Diagnosis}{16}{0}{5}
+\beamer@sectionintoc {6}{What's Next}{19}{0}{6}
